@@ -40,6 +40,17 @@ function createStream({ language = "en", onInterim, onFinal, onError }) {
         interimResults: true,
     };
 
+    // Let the caller speak in more than just the session language. Google
+    // accepts up to 3 alternative language codes for on-the-fly detection.
+    if (config.google.sttAutoDetect) {
+        const alternatives = config.google.sttAlternativeLanguages
+            .filter((code) => code && code !== languageCode)
+            .slice(0, 3);
+        if (alternatives.length) {
+            request.config.alternativeLanguageCodes = alternatives;
+        }
+    }
+
     let recognizeStream = null;
 
     function start() {

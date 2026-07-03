@@ -24,6 +24,16 @@ const config = {
         sttLanguage: process.env.STT_LANGUAGE || "en-IN",
         ttsLanguage: process.env.TTS_LANGUAGE || "en-IN",
         ttsVoice: process.env.TTS_VOICE || "en-IN-Neural2-A",
+        // When true, STT also listens for these extra languages on the same
+        // call, so a caller can code-switch (e.g. Hindi call + English words).
+        sttAutoDetect: bool(process.env.STT_AUTO_DETECT, true),
+        // Up to 3 BCP-47 codes used as alternatives to the session language.
+        sttAlternativeLanguages: (process.env.STT_ALTERNATIVE_LANGUAGES || "en-IN,hi-IN")
+            .split(",")
+            .map((c) => c.trim())
+            .filter(Boolean),
+        // Chirp3-HD speaker used across all languages (warm female = "Diya").
+        ttsChirpVoice: process.env.TTS_CHIRP_VOICE || "Kore",
     },
 
     gemini: {
