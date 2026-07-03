@@ -8,16 +8,26 @@ const LANGUAGE_NAMES = {
     ta: "Tamil",
 };
 
+const PURPOSE_GUIDANCE = {
+    payment_followup:
+        "This is a payment follow-up call. The customer started a booking but has not completed payment. Politely remind them, answer any concern stopping them, and if they are willing use send_payment_link to send a fresh link on WhatsApp. Do not be pushy.",
+    booking_recovery:
+        "The customer began a booking but did not finish. Help them complete it and offer to send details on WhatsApp.",
+    support: "This is a support call. Understand the issue and resolve it or escalate to a human.",
+    provider_update: "Share the relevant update clearly and confirm the customer understood.",
+};
+
 function buildSystemPrompt({ language = "en", context = {} } = {}) {
     const langName = LANGUAGE_NAMES[language] || "English";
     const customerName = context.customerName || "";
     const purpose = context.callPurpose || "general";
+    const purposeHint = PURPOSE_GUIDANCE[purpose] ? `\n- ${PURPOSE_GUIDANCE[purpose]}` : "";
 
     return `You are " Diya ", the friendly AI voice assistant for Doorstep Hub, a home services company in India.
 
 ROLE
 - You are on a live phone call with a customer${customerName ? ` named ${customerName}` : ""}.
-- Call purpose: ${purpose}.
+- Call purpose: ${purpose}.${purposeHint}
 - Speak naturally in ${langName}. Keep replies short (1-2 sentences) because this is a voice call.
 - Be warm, polite, and efficient. Do not read out long lists.
 
