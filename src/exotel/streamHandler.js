@@ -251,6 +251,7 @@ class CallStream {
 
     playFrames(frames) {
         return new Promise((resolve) => {
+            this.playbackResolve = resolve;
             this.pendingFrames = frames.slice();
             this.botSpeaking = true;
             this.speechFrameCount = 0;
@@ -269,6 +270,8 @@ class CallStream {
                 this.playbackTimer = setTimeout(tick, FRAME_INTERVAL_MS);
             };
             tick();
+        }).finally(() => {
+            this.playbackResolve = null;
         });
     }
 
@@ -285,6 +288,9 @@ class CallStream {
             logger.info("barge-in: playback cleared");
         }
         this.finishPlayback();
+        if (this.playbackResolve) {
+            this.playbackResolve();
+        }
     }
 
     finishPlayback() {
