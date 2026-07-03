@@ -41,6 +41,15 @@ const config = {
         model: process.env.AI_MODEL || "gemini-2.0-flash",
     },
 
+    // Main cPanel backend — the AI calls these endpoints to take real actions
+    // (payment link, WhatsApp, callback, escalation) during a live call.
+    backend: {
+        actionsUrl:
+            process.env.BACKEND_ACTIONS_URL ||
+            "https://api.doorstephub.com/v1/dhubApi/web/ai-voice/actions",
+        internalToken: process.env.AI_VOICE_INTERNAL_TOKEN || "",
+    },
+
     security: {
         allowedIps: (process.env.ALLOWED_IPS || "")
             .split(",")

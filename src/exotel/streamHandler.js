@@ -126,6 +126,7 @@ class CallStream {
         this.conversation = geminiService.createConversation({
             language: this.language,
             context,
+            sessionId: this.session?._id,
         });
 
         this.startStt();
