@@ -85,13 +85,20 @@ class CallStream {
     }
 
     async onStart(msg) {
-        const start = msg.start || {};
-        this.streamSid = start.stream_sid || msg.stream_sid;
-        this.callSid = start.call_sid || "";
-        const custom = start.custom_parameters || {};
-        const customField = custom.session_id || custom.sessionId || custom.CustomField || "";
+        try {
+            const start = msg.start || {};
+            this.streamSid = start.stream_sid || msg.stream_sid;
+            this.callSid = start.call_sid || "";
+            const custom = start.custom_parameters || {};
+            const customField =
+                custom.session_id ||
+                custom.sessionId ||
+                custom.CustomField ||
+                start.custom_field ||
+                start.customField ||
+                "";
 
-        logger.info(`stream start call_sid=${this.callSid} stream_sid=${this.streamSid}`);
+            logger.info(`stream start call_sid=${this.callSid} stream_sid=${this.streamSid}`);
 
         // Load the session the main backend created for this call.
         this.session = await sessionStore.findSession({
@@ -126,6 +133,9 @@ class CallStream {
         // Opening greeting.
         const greeting = await this.conversation.greeting();
         await this.speak(greeting, "ai");
+        } catch (err) {
+            logger.error("onStart failed:", err.message);
+        }
     }
 
     startStt() {
