@@ -11,9 +11,9 @@ const sessionStore = require("../services/sessionStore.service");
 // Frame pacing so we can interrupt (barge-in) mid-utterance.
 const FRAME_INTERVAL_MS = 90;
 // RMS threshold above which we treat incoming audio as speech (barge-in).
-const BARGE_IN_RMS = 900;
+const BARGE_IN_RMS = Number(process.env.BARGE_IN_RMS || 2200);
 // Consecutive speech frames required to trigger barge-in.
-const BARGE_IN_FRAMES = 3;
+const BARGE_IN_FRAMES = Number(process.env.BARGE_IN_FRAMES || 4);
 
 class CallStream {
     constructor(ws, meta = {}) {
