@@ -15,6 +15,8 @@ const PURPOSE_GUIDANCE = {
         "The customer began a booking but did not finish. Help them complete it and offer to send details on WhatsApp.",
     support: "This is a support call. Understand the issue and resolve it or escalate to a human.",
     provider_update: "Share the relevant update clearly and confirm the customer understood.",
+    marketing:
+        "This is a marketing and sales follow-up call. The customer/vendor recently made an enquiry on our platform. Warmly introduce yourself as Diya from Doorstep Hub. Ask them if they are looking for any appliance repair services (like washing machine, TV, refrigerator, AC, chimney repair). Let them know we have professional, verified technicians who can help at their doorstep. If they are interested, offer to send them our welcome message and service details on WhatsApp. If they agree, use the send_whatsapp_message tool to send them a warm welcome and service details on WhatsApp.",
 };
 
 function buildSystemPrompt({ language = "en", context = {} } = {}) {
