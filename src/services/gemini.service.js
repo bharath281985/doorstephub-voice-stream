@@ -17,6 +17,58 @@ function getClient() {
 // Cap tool-call round-trips per user turn so a misbehaving model can't loop.
 const MAX_TOOL_ROUNDS = 4;
 
+function buildGreetingInstruction(context = {}) {
+    const purpose = String(context.callPurpose || "general").trim();
+
+    if (purpose === "marketing") {
+        return "The call just connected. In one short, natural opening, introduce yourself as Diya from Doorstep Hub, say you are calling about doorstep appliance repair services, mention 2-3 common appliances naturally, and ask whether the customer needs any such repair service right now.";
+    }
+
+    if (purpose === "booking_recovery") {
+        return "The call just connected. In one short sentence, introduce yourself as Diya from Doorstep Hub, mention that the customer's booking was left incomplete, and ask if you can help them continue it.";
+    }
+
+    if (purpose === "payment_followup") {
+        return "The call just connected. In one short sentence, introduce yourself as Diya from Doorstep Hub, mention the customer's pending booking payment, and ask if they need help completing it.";
+    }
+
+    if (purpose === "support") {
+        return "The call just connected. In one short sentence, introduce yourself as Diya from Doorstep Hub support and ask how you can help with their issue today.";
+    }
+
+    if (purpose === "provider_update") {
+        return "The call just connected. In one short sentence, introduce yourself as Diya from Doorstep Hub and say you are calling with an update on their booking, then briefly ask if this is a good time.";
+    }
+
+    return "The call just connected. Greet the customer warmly in one short sentence and ask how you can help.";
+}
+
+function buildGreetingFallback(context = {}) {
+    const purpose = String(context.callPurpose || "general").trim();
+
+    if (purpose === "marketing") {
+        return "Hello! This is Diya from Doorstep Hub. We provide doorstep appliance repair services for AC, washing machine, refrigerator and more. Are you looking for any repair service today?";
+    }
+
+    if (purpose === "booking_recovery") {
+        return "Hello! This is Diya from Doorstep Hub. I noticed your booking was not completed. Shall I help you continue it?";
+    }
+
+    if (purpose === "payment_followup") {
+        return "Hello! This is Diya from Doorstep Hub. Your booking payment is still pending. Would you like help completing it today?";
+    }
+
+    if (purpose === "support") {
+        return "Hello! This is Diya from Doorstep Hub support. How can I help you today?";
+    }
+
+    if (purpose === "provider_update") {
+        return "Hello! This is Diya from Doorstep Hub. I am calling with an update on your booking.";
+    }
+
+    return "Hello! This is Doorstep Hub. How can I help you today?";
+}
+
 /**
  * Creates a stateful chat session for one call. Keeps conversation history
  * so Gemini has context across turns.
@@ -82,12 +134,12 @@ function createConversation({ language = "en", context = {}, sessionId = null } 
         async greeting() {
             try {
                 const response = await chat.sendMessage({
-                    message: "The call just connected. Greet the customer warmly in one short sentence and ask how you can help.",
+                    message: buildGreetingInstruction(context),
                 });
                 return (response.text || "").trim();
             } catch (err) {
                 logger.error("Gemini greeting error:", err.message);
-                return "Hello! This is Doorstep Hub. How can I help you today?";
+                return buildGreetingFallback(context);
             }
         },
     };
