@@ -37,6 +37,9 @@ class CallStream {
         this.processingTurn = false;
         this.pendingUserTurn = null;
         this.lastInterim = "";
+        this.interimCommitTimer = null;
+        this.lastAcceptedUtterance = "";
+        this.lastAcceptedUtteranceAt = 0;
         this.transcriptLog = [];
         this.outcome = "";
         this.closed = false;
@@ -168,8 +171,11 @@ class CallStream {
             language: this.language,
             onInterim: (text) => {
                 this.lastInterim = text;
+                this.scheduleInterimCommit();
             },
             onFinal: (text, confidence) => {
+                this.clearInterimCommit();
+                this.lastInterim = "";
                 if (text) this.onUserUtterance(text, confidence);
             },
             onError: (err) => {
@@ -183,6 +189,32 @@ class CallStream {
                 }
             },
         });
+    }
+
+    clearInterimCommit() {
+        if (this.interimCommitTimer) {
+            clearTimeout(this.interimCommitTimer);
+            this.interimCommitTimer = null;
+        }
+    }
+
+    scheduleInterimCommit() {
+        this.clearInterimCommit();
+        const interimText = String(this.lastInterim || "").trim();
+        if (!interimText || this.closed) return;
+
+        const commitAfterMs = Math.min(Number(config.limits.silenceTimeoutMs || 1500), 1500);
+        this.interimCommitTimer = setTimeout(() => {
+            this.interimCommitTimer = null;
+            if (this.closed || this.botSpeaking || !this.lastInterim) return;
+
+            const text = String(this.lastInterim || "").trim();
+            if (!text) return;
+
+            logger.info(`stt interim promoted: ${text}`);
+            this.lastInterim = "";
+            this.onUserUtterance(text, 0);
+        }, commitAfterMs);
     }
 
     onMedia(msg) {
@@ -221,7 +253,22 @@ class CallStream {
 
     async onUserUtterance(text, confidence) {
         if (!text || !String(text).trim()) return;
-        this.pendingUserTurn = { text: String(text).trim(), confidence };
+        const cleanText = String(text).trim();
+        const normalized = cleanText.toLowerCase();
+        const now = Date.now();
+
+        if (
+            normalized &&
+            normalized === this.lastAcceptedUtterance &&
+            now - this.lastAcceptedUtteranceAt < 4000
+        ) {
+            logger.info(`duplicate utterance ignored: ${cleanText}`);
+            return;
+        }
+
+        this.lastAcceptedUtterance = normalized;
+        this.lastAcceptedUtteranceAt = now;
+        this.pendingUserTurn = { text: cleanText, confidence };
         if (this.processingTurn) return;
 
         while (this.pendingUserTurn && !this.closed) {
@@ -345,6 +392,7 @@ class CallStream {
         this.closed = true;
 
         this.finishPlayback();
+        this.clearInterimCommit();
         clearTimeout(this.maxCallTimer);
         if (this.stt) this.stt.end();
 
