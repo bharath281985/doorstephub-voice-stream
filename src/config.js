@@ -22,6 +22,7 @@ const config = {
         credentials: process.env.GOOGLE_APPLICATION_CREDENTIALS || "",
         projectId: process.env.GCP_PROJECT_ID || "",
         sttLanguage: process.env.STT_LANGUAGE || "en-IN",
+        sttModel: process.env.STT_MODEL || "latest_short",
         ttsLanguage: process.env.TTS_LANGUAGE || "en-IN",
         ttsVoice: process.env.TTS_VOICE || "en-IN-Neural2-A",
         // When true, STT also listens for these extra languages on the same
@@ -62,6 +63,7 @@ const config = {
     limits: {
         maxCallSeconds: Number(process.env.MAX_CALL_SECONDS || 600),
         silenceTimeoutMs: Number(process.env.SILENCE_TIMEOUT_MS || 8000),
+        playbackFrameMs: Number(process.env.PLAYBACK_FRAME_MS || 55),
     },
 };
 

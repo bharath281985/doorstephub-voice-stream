@@ -36,7 +36,7 @@ function createStream({ language = "en", onInterim, onFinal, onError }) {
             sampleRateHertz: config.audio.sampleRate,
             languageCode,
             enableAutomaticPunctuation: true,
-            model: "latest_long",
+            model: config.google.sttModel || "latest_short",
             useEnhanced: true,
         },
         interimResults: true,

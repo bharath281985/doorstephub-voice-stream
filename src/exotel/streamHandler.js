@@ -9,7 +9,7 @@ const geminiService = require("../services/gemini.service");
 const sessionStore = require("../services/sessionStore.service");
 
 // Frame pacing so we can interrupt (barge-in) mid-utterance.
-const FRAME_INTERVAL_MS = 90;
+const FRAME_INTERVAL_MS = Number(config.limits.playbackFrameMs || 55);
 // RMS threshold above which we treat incoming audio as speech (barge-in).
 const BARGE_IN_RMS = Number(process.env.BARGE_IN_RMS || 2200);
 // Consecutive speech frames required to trigger barge-in.
@@ -34,6 +34,7 @@ class CallStream {
         this.speechFrameCount = 0;
 
         this.processingTurn = false;
+        this.pendingUserTurn = null;
         this.lastInterim = "";
         this.transcriptLog = [];
         this.outcome = "";
@@ -196,31 +197,39 @@ class CallStream {
     }
 
     async onUserUtterance(text, confidence) {
+        if (!text || !String(text).trim()) return;
+        this.pendingUserTurn = { text: String(text).trim(), confidence };
         if (this.processingTurn) return;
-        this.processingTurn = true;
 
-        logger.info(`customer: ${text}`);
-        this.transcriptLog.push({ speaker: "customer", text });
-        sessionStore.addMessage({
-            sessionId: this.session?._id,
-            speaker: "customer",
-            language: this.language,
-            transcriptText: text,
-            confidence,
-        });
+        while (this.pendingUserTurn && !this.closed) {
+            const turn = this.pendingUserTurn;
+            this.pendingUserTurn = null;
+            this.processingTurn = true;
 
-        const { text: reply, escalate, error } = await this.conversation.reply(text);
-        if (escalate) this.outcome = "escalated";
+            logger.info(`customer: ${turn.text}`);
+            this.transcriptLog.push({ speaker: "customer", text: turn.text });
+            sessionStore.addMessage({
+                sessionId: this.session?._id,
+                speaker: "customer",
+                language: this.language,
+                transcriptText: turn.text,
+                confidence: turn.confidence,
+            });
 
-        if (reply) {
-            await this.speak(reply, "ai");
-        }
+            const { text: reply, escalate, error } = await this.conversation.reply(turn.text);
+            if (escalate) this.outcome = "escalated";
 
-        this.processingTurn = false;
+            if (reply) {
+                await this.speak(reply, "ai");
+            }
 
-        if (escalate && !error) {
-            // Give the closing line time to play, then end.
-            setTimeout(() => this.endCall("escalated"), 1200);
+            this.processingTurn = false;
+
+            if (escalate && !error) {
+                // Give the closing line time to play, then end.
+                setTimeout(() => this.endCall("escalated"), 1200);
+                return;
+            }
         }
     }
 

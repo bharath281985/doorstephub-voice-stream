@@ -84,7 +84,7 @@ function createConversation({ language = "en", context = {}, sessionId = null } 
         config: {
             systemInstruction,
             temperature: 0.6,
-            maxOutputTokens: 200,
+            maxOutputTokens: 120,
             tools: [{ functionDeclarations: actionsService.functionDeclarations }],
         },
         history: [],
