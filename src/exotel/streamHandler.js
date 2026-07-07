@@ -7,6 +7,7 @@ const sttService = require("../services/stt.service");
 const ttsService = require("../services/tts.service");
 const geminiService = require("../services/gemini.service");
 const sessionStore = require("../services/sessionStore.service");
+const actionsService = require("../services/actions.service");
 
 // Frame pacing so we can interrupt (barge-in) mid-utterance.
 const FRAME_INTERVAL_MS = Number(config.limits.playbackFrameMs || 55);
@@ -128,6 +129,19 @@ class CallStream {
                 this.session?.metadata?.customerLocation ||
                 "",
         };
+
+        if (this.session?._id) {
+            try {
+                const catalog = await actionsService.execute(this.session._id, "get_live_catalog_snapshot", {
+                    city: context.customerLocation,
+                });
+                if (catalog?.success && catalog.summaryText) {
+                    context.liveCatalogSummary = catalog.summaryText;
+                }
+            } catch (err) {
+                logger.warn("live catalog prefetch failed:", err.message);
+            }
+        }
 
         this.conversation = geminiService.createConversation({
             language: this.language,

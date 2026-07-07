@@ -16,6 +16,7 @@ function getClient() {
 
 // Cap tool-call round-trips per user turn so a misbehaving model can't loop.
 const MAX_TOOL_ROUNDS = 4;
+const PREFLIGHT_LOOKUP_PURPOSES = new Set(["marketing", "general", "manual_test"]);
 
 function buildGreetingInstruction(context = {}) {
     const purpose = String(context.callPurpose || "general").trim();
@@ -69,6 +70,78 @@ function buildGreetingFallback(context = {}) {
     return "Hello! This is Doorstep Hub. How can I help you today?";
 }
 
+function shouldRunPrefightLookup(userText = "", context = {}, sessionId = null) {
+    if (!sessionId) return false;
+    const purpose = String(context.callPurpose || "").trim();
+    if (!PREFLIGHT_LOOKUP_PURPOSES.has(purpose)) return false;
+    const text = String(userText || "").trim();
+    if (text.length < 4) return false;
+    if (/^(yes|no|okay|ok|hmm|hello|hi)$/i.test(text)) return false;
+    return true;
+}
+
+function summarizeLookupResult(result = {}) {
+    const lines = [];
+    lines.push("Live backend availability check:");
+    lines.push(`- Query: ${String(result.query || "").trim() || "unknown"}`);
+    lines.push(`- City: ${String(result.city || "").trim() || "unknown"}`);
+    lines.push(`- Available: ${result.available ? "likely yes" : "no clear match yet"}`);
+
+    const matches = Array.isArray(result.matches) ? result.matches.slice(0, 6) : [];
+    if (matches.length) {
+        lines.push("- Matching live catalog entries:");
+        for (const item of matches) {
+            const label = String(item.label || "").trim();
+            const category = String(item.categoryName || "").trim();
+            const subcategory = String(item.subcategoryName || "").trim();
+            const parts = [label];
+            if (category && category.toLowerCase() !== label.toLowerCase()) parts.push(`category: ${category}`);
+            if (subcategory && subcategory.toLowerCase() !== label.toLowerCase()) {
+                parts.push(`subcategory: ${subcategory}`);
+            }
+            lines.push(`  - ${parts.join(" | ")}`);
+        }
+    }
+
+    if (!result.available) {
+        lines.push(
+            "- Instruction: do not give a hard no. Say the team will verify and follow up unless the customer asks for immediate escalation.",
+        );
+    }
+
+    return lines.join("\n");
+}
+
+async function buildPrefightLookupContext(userText = "", context = {}, sessionId = null) {
+    if (!shouldRunPrefightLookup(userText, context, sessionId)) {
+        return userText;
+    }
+
+    try {
+        const lookup = await actionsService.execute(sessionId, "lookup_service_availability", {
+            query: userText,
+            city: context.customerLocation || "",
+        });
+
+        if (!lookup?.success) {
+            return userText;
+        }
+
+        logger.info(
+            `prefight lookup available=${lookup.available ? "yes" : "no"} query=${JSON.stringify(lookup.query || userText)}`,
+        );
+
+        return [
+            `Customer exact words: ${String(userText || "").trim()}`,
+            summarizeLookupResult(lookup),
+            "Use the live backend data above while answering. Prefer matching categories, subcategories, and services from the server over generic assumptions.",
+        ].join("\n\n");
+    } catch (err) {
+        logger.warn("prefight lookup failed:", err.message);
+        return userText;
+    }
+}
+
 /**
  * Creates a stateful chat session for one call. Keeps conversation history
  * so Gemini has context across turns.
@@ -119,7 +192,8 @@ function createConversation({ language = "en", context = {}, sessionId = null } 
     return {
         async reply(userText) {
             try {
-                const { text, escalate } = await runTurn(userText);
+                const groundedMessage = await buildPrefightLookupContext(userText, context, sessionId);
+                const { text, escalate } = await runTurn(groundedMessage);
                 return { text, escalate: escalate || /\bescalat/i.test(text) };
             } catch (err) {
                 logger.error("Gemini reply error:", err.message);

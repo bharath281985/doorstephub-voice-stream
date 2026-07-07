@@ -13,6 +13,20 @@ const STRING = "STRING";
  */
 const functionDeclarations = [
     {
+        name: "get_live_catalog_snapshot",
+        description:
+            "Load the live Doorstep Hub categories, subcategories, and services for a city from the backend server. Use when you need broader catalog context before discussing availability.",
+        parameters: {
+            type: OBJECT,
+            properties: {
+                city: {
+                    type: STRING,
+                    description: "Optional city or location to load the live catalog for, such as Hyderabad.",
+                },
+            },
+        },
+    },
+    {
         name: "lookup_service_availability",
         description:
             "Check Doorstep Hub's live backend catalog for whether a requested service is available, optionally in a specific city. Use this before saying a service is unavailable or unsupported.",
