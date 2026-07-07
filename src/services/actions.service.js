@@ -13,6 +13,25 @@ const STRING = "STRING";
  */
 const functionDeclarations = [
     {
+        name: "lookup_service_availability",
+        description:
+            "Check Doorstep Hub's live backend catalog for whether a requested service is available, optionally in a specific city. Use this before saying a service is unavailable or unsupported.",
+        parameters: {
+            type: OBJECT,
+            properties: {
+                query: {
+                    type: STRING,
+                    description: "The service or repair need mentioned by the customer, such as computer repair, laptop repair, AC repair, or plumbing.",
+                },
+                city: {
+                    type: STRING,
+                    description: "Optional city or location to check availability in, such as Hyderabad.",
+                },
+            },
+            required: ["query"],
+        },
+    },
+    {
         name: "send_payment_link",
         description:
             "Generate and send a secure payment link to the customer on WhatsApp for their pending booking. Use when the customer agrees to pay or asks for a payment link.",

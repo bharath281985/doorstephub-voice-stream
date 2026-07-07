@@ -21,7 +21,7 @@ function buildGreetingInstruction(context = {}) {
     const purpose = String(context.callPurpose || "general").trim();
 
     if (purpose === "marketing") {
-        return "The call just connected. In one short, natural opening, introduce yourself as Diya from Doorstep Hub, say you are calling about doorstep appliance repair services, mention 2-3 common appliances naturally, and ask whether the customer needs any such repair service right now.";
+        return "The call just connected. In one short, natural opening, introduce yourself as Diya from Doorstep Hub, say you are calling about doorstep repair and home services, and ask what service the customer needs in their city right now.";
     }
 
     if (purpose === "booking_recovery") {
@@ -47,7 +47,7 @@ function buildGreetingFallback(context = {}) {
     const purpose = String(context.callPurpose || "general").trim();
 
     if (purpose === "marketing") {
-        return "Hello! This is Diya from Doorstep Hub. We provide doorstep appliance repair services for AC, washing machine, refrigerator and more. Are you looking for any repair service today?";
+        return "Hello! This is Diya from Doorstep Hub. We help with doorstep repair and home services. What service are you looking for today?";
     }
 
     if (purpose === "booking_recovery") {

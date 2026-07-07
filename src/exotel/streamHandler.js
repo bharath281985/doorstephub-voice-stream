@@ -122,6 +122,11 @@ class CallStream {
         const context = {
             callPurpose: this.session?.callPurpose,
             customerName: this.session?.metadata?.customerName,
+            customerLocation:
+                this.session?.metadata?.location ||
+                this.session?.metadata?.city ||
+                this.session?.metadata?.customerLocation ||
+                "",
         };
 
         this.conversation = geminiService.createConversation({
