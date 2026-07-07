@@ -187,6 +187,41 @@ function buildPartnerLeadTurnContext(userText = "", context = {}) {
     ].filter(Boolean).join("\n");
 }
 
+function buildToolFallbackReply(calls = [], results = [], context = {}) {
+    const entries = Array.isArray(calls)
+        ? calls.map((call, index) => ({
+              name: call?.name || "",
+              result: results[index]?.functionResponse?.response || {},
+          }))
+        : [];
+
+    for (const entry of entries) {
+        if (entry.name === "send_whatsapp_message" && entry.result?.success !== false) {
+            return isPartnerLeadContext(context)
+                ? "I've sent the partner onboarding details to your WhatsApp. Please review them and our team will guide you on the next steps."
+                : "I've sent the details to your WhatsApp. Please check them and let me know if you need any help.";
+        }
+    }
+
+    for (const entry of entries) {
+        if (entry.name === "send_payment_link" && entry.result?.success !== false) {
+            return "I've sent the payment link to your WhatsApp. Please check it when you are ready.";
+        }
+        if (entry.name === "schedule_callback" && entry.result?.success !== false) {
+            return "I've noted your callback request. Our team will reach out at the suitable time.";
+        }
+        if (entry.name === "capture_outcome" && entry.result?.success !== false) {
+            return isPartnerLeadContext(context)
+                ? "Thank you for your time. Our partner onboarding team will follow up with you shortly."
+                : "Thank you for your time. Our team will follow up with you shortly.";
+        }
+    }
+
+    return isPartnerLeadContext(context)
+        ? "Thank you. Our partner onboarding team will follow up with you on WhatsApp shortly."
+        : "Thank you. Our team will follow up with you shortly.";
+}
+
 /**
  * Creates a stateful chat session for one call. Keeps conversation history
  * so Gemini has context across turns.
@@ -213,10 +248,13 @@ function createConversation({ language = "en", context = {}, sessionId = null } 
     async function runTurn(message) {
         let response = await chat.sendMessage({ message });
         let escalate = false;
+        let lastCalls = [];
+        let lastResponses = [];
 
         for (let round = 0; round < MAX_TOOL_ROUNDS; round += 1) {
             const calls = response.functionCalls || [];
             if (!calls.length) break;
+            lastCalls = calls;
 
             const responses = [];
             for (const call of calls) {
@@ -227,11 +265,22 @@ function createConversation({ language = "en", context = {}, sessionId = null } 
                     functionResponse: { name: call.name, response: result },
                 });
             }
+            lastResponses = responses;
 
             response = await chat.sendMessage({ message: responses });
         }
 
-        return { text: (response.text || "").trim(), escalate };
+        const finalText = (response.text || "").trim();
+        if (finalText) {
+            return { text: finalText, escalate };
+        }
+
+        if (lastCalls.length) {
+            logger.warn("Gemini returned empty text after tool execution; using fallback reply.");
+            return { text: buildToolFallbackReply(lastCalls, lastResponses, context), escalate };
+        }
+
+        return { text: "", escalate };
     }
 
     return {
