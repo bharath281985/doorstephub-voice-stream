@@ -152,7 +152,7 @@ class CallStream {
                 logger.error("stt error, restarting:", err.message);
                 if (!this.closed) {
                     try {
-                        this.stt.restart();
+                        this.stt.restart(err?.message || "stream_error");
                     } catch (_) {
                         /* noop */
                     }

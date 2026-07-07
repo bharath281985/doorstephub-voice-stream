@@ -19,6 +19,8 @@ const LANG_MAP = {
     ta: "ta-IN",
 };
 
+const STREAM_ROLLOVER_MS = 4.5 * 60 * 1000;
+
 /**
  * Creates a streaming recognizer for one call turn / session.
  * Emits interim + final transcripts via the provided callbacks.
@@ -52,15 +54,60 @@ function createStream({ language = "en", onInterim, onFinal, onError }) {
     }
 
     let recognizeStream = null;
+    let closed = false;
+    let restarting = false;
+    let streamGeneration = 0;
+    let rolloverTimer = null;
+
+    function clearRolloverTimer() {
+        if (rolloverTimer) {
+            clearTimeout(rolloverTimer);
+            rolloverTimer = null;
+        }
+    }
+
+    function scheduleRollover() {
+        clearRolloverTimer();
+        rolloverTimer = setTimeout(() => {
+            api.restart("rollover");
+        }, STREAM_ROLLOVER_MS);
+    }
+
+    function cleanupStream(stream) {
+        if (!stream) return;
+        try {
+            stream.removeAllListeners("error");
+            stream.removeAllListeners("data");
+        } catch (_) {
+            /* noop */
+        }
+        try {
+            if (!stream.destroyed && !stream.writableEnded) {
+                stream.end();
+            }
+        } catch (_) {
+            /* noop */
+        }
+        try {
+            if (!stream.destroyed) {
+                stream.destroy();
+            }
+        } catch (_) {
+            /* noop */
+        }
+    }
 
     function start() {
+        const currentGeneration = ++streamGeneration;
         recognizeStream = getClient()
             .streamingRecognize(request)
             .on("error", (err) => {
+                if (closed || currentGeneration !== streamGeneration) return;
                 logger.error("STT stream error:", err.message);
                 if (onError) onError(err);
             })
             .on("data", (data) => {
+                if (closed || currentGeneration !== streamGeneration) return;
                 const result = data.results?.[0];
                 if (!result || !result.alternatives?.[0]) return;
                 const transcript = result.alternatives[0].transcript || "";
@@ -70,13 +117,21 @@ function createStream({ language = "en", onInterim, onFinal, onError }) {
                     onInterim(transcript.trim());
                 }
             });
+        scheduleRollover();
     }
 
     start();
 
-    return {
+    const api = {
         write(buf) {
-            if (recognizeStream && !recognizeStream.destroyed) {
+            if (
+                !closed &&
+                !restarting &&
+                recognizeStream &&
+                !recognizeStream.destroyed &&
+                !recognizeStream.writableEnded &&
+                typeof recognizeStream.write === "function"
+            ) {
                 try {
                     recognizeStream.write(buf);
                 } catch (err) {
@@ -85,20 +140,25 @@ function createStream({ language = "en", onInterim, onFinal, onError }) {
             }
         },
         end() {
-            if (recognizeStream && !recognizeStream.destroyed) {
-                try {
-                    recognizeStream.end();
-                } catch (_) {
-                    /* noop */
-                }
-            }
+            closed = true;
+            clearRolloverTimer();
+            cleanupStream(recognizeStream);
+            recognizeStream = null;
         },
         // Google streaming STT has a ~5min limit; call restart() to renew.
-        restart() {
-            this.end();
+        restart(reason = "manual") {
+            if (closed || restarting) return;
+            restarting = true;
+            logger.info(`STT stream restart: ${reason}`);
+            clearRolloverTimer();
+            const previousStream = recognizeStream;
+            recognizeStream = null;
+            cleanupStream(previousStream);
             start();
+            restarting = false;
         },
     };
+    return api;
 }
 
 module.exports = { createStream, LANG_MAP };
