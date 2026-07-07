@@ -25,7 +25,7 @@ function buildGreetingInstruction(context = {}) {
     const sourceCategory = String(context.sourceCategory || "").trim();
 
     if (sourceContext === "vendorEnquiry") {
-        return `The call just connected. In one short natural opening, introduce yourself as Diya from Doorstep Hub, say you saw they are an appliance service technician or partner interested in joining Doorstep Hub${sourceCategory ? ` for ${sourceCategory}` : ""}${sourceRequirement ? ` regarding ${sourceRequirement}` : ""}, and ask which city they work in.`;
+        return `The call just connected. In one short natural opening, introduce yourself as Diya from Doorstep Hub, say you saw they are an appliance service technician or partner interested in joining Doorstep Hub${sourceCategory ? ` for ${sourceCategory}` : ""}${sourceRequirement ? ` regarding ${sourceRequirement}` : ""}, say you are sending the partner onboarding details on WhatsApp, and do not ask if they need any service.`;
     }
 
     if (sourceContext === "enquiry") {
@@ -63,7 +63,7 @@ function buildGreetingFallback(context = {}) {
 
     if (sourceContext === "vendorEnquiry") {
         const partnerScope = [sourceCategory, sourceRequirement].filter(Boolean).join(" - ");
-        return `Hello! This is Diya from Doorstep Hub. We saw your interest in joining as a service technician${partnerScope ? ` for ${partnerScope}` : ""}. Which city are you currently working in?`;
+        return `Hello! This is Diya from Doorstep Hub. We saw your interest in joining as a service technician${partnerScope ? ` for ${partnerScope}` : ""}. We are sending the partner onboarding details on WhatsApp now.`;
     }
 
     if (sourceContext === "enquiry") {
