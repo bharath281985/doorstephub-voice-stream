@@ -17,13 +17,18 @@ function getClient() {
 // Cap tool-call round-trips per user turn so a misbehaving model can't loop.
 const MAX_TOOL_ROUNDS = 4;
 const PREFLIGHT_LOOKUP_PURPOSES = new Set(["marketing", "general", "manual_test"]);
+const PARTNER_LEAD_CONTEXTS = new Set(["vendorEnquiry", "provider", "professionalProvider"]);
+
+function isPartnerLeadContext(context = {}) {
+    return PARTNER_LEAD_CONTEXTS.has(String(context.sourceContext || "").trim());
+}
 
 function buildGreetingInstruction(context = {}) {
     const purpose = String(context.callPurpose || "general").trim();
     const sourceContext = String(context.sourceContext || "").trim();
     const sourceRequirement = String(context.sourceRequirement || "").trim();
     const sourceCategory = String(context.sourceCategory || "").trim();
-    const isPartnerLead = ["vendorEnquiry", "provider", "professionalProvider"].includes(sourceContext);
+    const isPartnerLead = PARTNER_LEAD_CONTEXTS.has(sourceContext);
 
     if (isPartnerLead) {
         return `The call just connected. In one short natural opening, introduce yourself as Diya from Doorstep Hub, say you saw they are an appliance service technician or partner interested in joining Doorstep Hub${sourceCategory ? ` for ${sourceCategory}` : ""}${sourceRequirement ? ` regarding ${sourceRequirement}` : ""}, say you are sending the partner onboarding details on WhatsApp, and do not ask if they need any service.`;
@@ -61,7 +66,7 @@ function buildGreetingFallback(context = {}) {
     const sourceContext = String(context.sourceContext || "").trim();
     const sourceRequirement = String(context.sourceRequirement || "").trim();
     const sourceCategory = String(context.sourceCategory || "").trim();
-    const isPartnerLead = ["vendorEnquiry", "provider", "professionalProvider"].includes(sourceContext);
+    const isPartnerLead = PARTNER_LEAD_CONTEXTS.has(sourceContext);
 
     if (isPartnerLead) {
         const partnerScope = [sourceCategory, sourceRequirement].filter(Boolean).join(" - ");
@@ -167,6 +172,21 @@ async function buildPrefightLookupContext(userText = "", context = {}, sessionId
     }
 }
 
+function buildPartnerLeadTurnContext(userText = "", context = {}) {
+    const city = String(context.customerLocation || "").trim();
+    const category = String(context.sourceCategory || context.sourceRequirement || "").trim();
+
+    return [
+        "Partner onboarding reminder:",
+        "- This caller is a technician or service partner lead, not a customer lead.",
+        "- Do not ask what service they need, do not ask if they want appliance repair, and do not switch into customer booking support.",
+        "- Keep the conversation focused on partner onboarding, technician category, working city, and confirming that WhatsApp onboarding details are being sent.",
+        city ? `- Known city/location: ${city}` : "",
+        category ? `- Known category/specialization: ${category}` : "",
+        `Partner's latest words: ${String(userText || "").trim()}`,
+    ].filter(Boolean).join("\n");
+}
+
 /**
  * Creates a stateful chat session for one call. Keeps conversation history
  * so Gemini has context across turns.
@@ -217,7 +237,9 @@ function createConversation({ language = "en", context = {}, sessionId = null } 
     return {
         async reply(userText) {
             try {
-                const groundedMessage = await buildPrefightLookupContext(userText, context, sessionId);
+                const groundedMessage = isPartnerLeadContext(context)
+                    ? buildPartnerLeadTurnContext(userText, context)
+                    : await buildPrefightLookupContext(userText, context, sessionId);
                 const { text, escalate } = await runTurn(groundedMessage);
                 return { text, escalate: escalate || /\bescalat/i.test(text) };
             } catch (err) {
