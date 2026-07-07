@@ -20,6 +20,17 @@ const PREFLIGHT_LOOKUP_PURPOSES = new Set(["marketing", "general", "manual_test"
 
 function buildGreetingInstruction(context = {}) {
     const purpose = String(context.callPurpose || "general").trim();
+    const sourceContext = String(context.sourceContext || "").trim();
+    const sourceRequirement = String(context.sourceRequirement || "").trim();
+    const sourceCategory = String(context.sourceCategory || "").trim();
+
+    if (sourceContext === "vendorEnquiry") {
+        return `The call just connected. In one short natural opening, introduce yourself as Diya from Doorstep Hub, say you are calling about their partner registration enquiry${sourceCategory ? ` for ${sourceCategory}` : ""}${sourceRequirement ? ` regarding ${sourceRequirement}` : ""}, briefly mention that the partner onboarding team will guide the next steps, and keep the call ready to close after this update.`;
+    }
+
+    if (sourceContext === "enquiry") {
+        return `The call just connected. In one short natural opening, introduce yourself as Diya from Doorstep Hub, mention that they were looking for a service${sourceRequirement ? ` like ${sourceRequirement}` : ""}, briefly say Doorstep Hub can help with doorstep services, and ask if they still need assistance.`;
+    }
 
     if (purpose === "marketing") {
         return "The call just connected. In one short, natural opening, introduce yourself as Diya from Doorstep Hub, say you are calling about doorstep repair and home services, and ask what service the customer needs in their city right now.";
@@ -46,6 +57,18 @@ function buildGreetingInstruction(context = {}) {
 
 function buildGreetingFallback(context = {}) {
     const purpose = String(context.callPurpose || "general").trim();
+    const sourceContext = String(context.sourceContext || "").trim();
+    const sourceRequirement = String(context.sourceRequirement || "").trim();
+    const sourceCategory = String(context.sourceCategory || "").trim();
+
+    if (sourceContext === "vendorEnquiry") {
+        const partnerScope = [sourceCategory, sourceRequirement].filter(Boolean).join(" - ");
+        return `Hello! This is Diya from Doorstep Hub. I am calling about your partner registration enquiry${partnerScope ? ` for ${partnerScope}` : ""}. Our onboarding team will guide you with the next steps shortly.`;
+    }
+
+    if (sourceContext === "enquiry") {
+        return `Hello! This is Diya from Doorstep Hub. I understand you were looking for a service${sourceRequirement ? ` like ${sourceRequirement}` : ""}. We can help with trusted doorstep service support. Are you still looking for this service?`;
+    }
 
     if (purpose === "marketing") {
         return "Hello! This is Diya from Doorstep Hub. We help with doorstep repair and home services. What service are you looking for today?";

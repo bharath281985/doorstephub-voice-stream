@@ -128,6 +128,10 @@ class CallStream {
                 this.session?.metadata?.city ||
                 this.session?.metadata?.customerLocation ||
                 "",
+            sourceContext: this.session?.metadata?.sourceContext || "",
+            sourceRequirement: this.session?.metadata?.sourceRequirement || "",
+            sourceCategory: this.session?.metadata?.sourceCategory || "",
+            sourceRemarks: this.session?.metadata?.sourceRemarks || "",
         };
 
         if (this.session?._id) {

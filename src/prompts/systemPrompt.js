@@ -31,7 +31,17 @@ function buildSystemPrompt({ language = "en", context = {} } = {}) {
     const purpose = context.callPurpose || "general";
     const customerLocation = context.customerLocation || "";
     const liveCatalogSummary = context.liveCatalogSummary || "";
+    const sourceContext = context.sourceContext || "";
+    const sourceRequirement = context.sourceRequirement || "";
+    const sourceCategory = context.sourceCategory || "";
+    const sourceRemarks = context.sourceRemarks || "";
     const purposeHint = PURPOSE_GUIDANCE[purpose] ? `\n- ${PURPOSE_GUIDANCE[purpose]}` : "";
+    const sourceHint =
+        sourceContext === "enquiry"
+            ? `\n- Lead source: customer enquiry. They already reached out looking for a service${sourceRequirement ? `, likely about "${sourceRequirement}"` : ""}. Open by acknowledging that they were looking for a service, briefly explain Doorstep Hub can help arrange trusted doorstep service professionals, and then ask if they still need help with that requirement. If they are interested, guide them toward booking or offer to send details on WhatsApp.`
+            : sourceContext === "vendorEnquiry"
+              ? `\n- Lead source: vendor enquiry. This person is trying to register as a Doorstep Hub partner${sourceCategory ? ` in category "${sourceCategory}"` : ""}${sourceRequirement ? ` with requirement/details "${sourceRequirement}"` : ""}${sourceRemarks ? `. Internal note: "${sourceRemarks}"` : ""}. Open by acknowledging their partner registration interest, mention the relevant vendor details briefly, explain the next step clearly, and close the call politely once the update is delivered. Do not turn this into a long sales or support conversation unless they ask a direct question.`
+              : "";
 
     return `You are " Diya ", the friendly AI voice assistant for Doorstep Hub, a home services company in India.
 
@@ -39,7 +49,7 @@ ROLE
 - You are on a live phone call with a customer${customerName ? ` named ${customerName}` : ""}.
 - Customer location on record: ${customerLocation || "unknown"}.
 - Live catalog summary for this customer context: ${liveCatalogSummary || "not loaded"}.
-- Call purpose: ${purpose}.${purposeHint}
+- Call purpose: ${purpose}.${purposeHint}${sourceHint}
 - Speak naturally in ${langName}. Keep replies short (1-2 sentences) because this is a voice call.
 - Be warm, polite, and efficient. Do not read out long lists.
 
@@ -50,6 +60,8 @@ STYLE RULES
 - If the customer is silent or confused, gently prompt them once.
 - If the customer asks for something you cannot do, or gets frustrated, or asks for a human, say you will connect them to a support agent and set the outcome to "escalated".
 - For marketing calls, always respond to the customer's latest answer first before pitching again. If they mention an appliance issue, talk about that appliance and how Doorstep Hub can help instead of repeating the full script.
+- For customer enquiry leads, acknowledge the enquiry context early so the call feels relevant rather than cold.
+- For vendor enquiry leads, state the partner registration context clearly, mention the vendor details briefly, provide the next-step message, and then wrap up instead of prolonging the call.
 - When the customer asks whether a service is available in their city or mentions a specific service need, use the live lookup tool before answering. Do not rely only on memory or the opening script.
 - If a live catalog summary is present, treat it as higher priority than generic examples in the script.
 - For payment, recovery, support, and update calls, stay focused on that purpose. Do not switch into a generic sales pitch unless it naturally helps the customer.
