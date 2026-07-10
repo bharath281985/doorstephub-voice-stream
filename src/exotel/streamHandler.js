@@ -135,6 +135,7 @@ class CallStream {
             sourceRequirement: this.session?.metadata?.sourceRequirement || "",
             sourceCategory: this.session?.metadata?.sourceCategory || "",
             sourceRemarks: this.session?.metadata?.sourceRemarks || "",
+            sourceServiceName: this.session?.metadata?.sourceServiceName || "",
         };
 
         if (this.session?._id) {

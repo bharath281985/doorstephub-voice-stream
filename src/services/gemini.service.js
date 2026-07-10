@@ -5,6 +5,10 @@ const config = require("../config");
 const logger = require("../logger");
 const { buildSystemPrompt } = require("../prompts/systemPrompt");
 const actionsService = require("./actions.service");
+const {
+    getProfessionalVerticalCopy,
+    formatHomeApplianceCatalogPitch,
+} = require("../utils/professionalOnboarding");
 
 let ai = null;
 function getClient() {
@@ -22,13 +26,26 @@ const PARTNER_LEAD_CONTEXTS = new Set([
     "provider",
     "professionalProvider",
     "pendingServiceProvider",
+    "pendingProfessionalProvider",
 ]);
+
+function isPendingProfessionalProviderContext(context = {}) {
+    return String(context.sourceContext || "").trim() === "pendingProfessionalProvider";
+}
 
 function isPendingServiceProviderContext(context = {}) {
     return String(context.sourceContext || "").trim() === "pendingServiceProvider";
 }
 
 function buildLiveCatalogSpeechLine(context = {}) {
+    if (isPendingServiceProviderContext(context)) {
+        return formatHomeApplianceCatalogPitch({
+            categories: extractCatalogPart(context.liveCatalogSummary, "Categories"),
+            subcategories: extractCatalogPart(context.liveCatalogSummary, "Subcategories"),
+            services: extractCatalogPart(context.liveCatalogSummary, "Services"),
+        }).replace(/^Doorstep Hub partner onboarding is focused on home appliance services only, including /, "").replace(/\.$/, "") || "home appliance repair and related appliance services";
+    }
+
     const summary = String(context.liveCatalogSummary || "").trim();
     if (!summary) {
         return "our live Doorstep Hub service catalog";
@@ -40,6 +57,24 @@ function buildLiveCatalogSpeechLine(context = {}) {
     }
 
     return `our live services: ${summary.replace(/\s*\|\s*/g, ", ")}`;
+}
+
+function extractCatalogPart(summary = "", label = "") {
+    const match = String(summary || "").match(new RegExp(`${label}:\\s*([^|]+)`, "i"));
+    if (!match?.[1]) return [];
+    return match[1]
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
+}
+
+function getProfessionalContextMeta(context = {}) {
+    return {
+        sourceServiceName: context.sourceServiceName || "",
+        sourceCategory: context.sourceCategory || "",
+        sourceRequirement: context.sourceRequirement || "",
+        sourceRemarks: context.sourceRemarks || "",
+    };
 }
 
 function isPartnerLeadContext(context = {}) {
@@ -54,7 +89,12 @@ function buildGreetingInstruction(context = {}) {
     const isPartnerLead = PARTNER_LEAD_CONTEXTS.has(sourceContext);
 
     if (sourceContext === "pendingServiceProvider") {
-        return "The call just connected. In one short natural opening, introduce yourself as Diya from Doorstep Hub, warmly ask whether they are a vendor or service technician who wants to grow their business, briefly mention that Doorstep Hub helps partners get more customer bookings using the live service catalog summary in context (mention real categories or services from it, never random examples), invite them to join the Doorstep Hub partner network, and mention that you are sending the partner onboarding details on WhatsApp.";
+        return "The call just connected. In one short natural opening, introduce yourself as Diya from Doorstep Hub, warmly ask whether they are a vendor or home appliance service technician who wants to grow their business, briefly mention that Doorstep Hub partner onboarding is for home appliance services only and use the live home-appliance catalog summary in context, invite them to join the Doorstep Hub partner network, and mention that you are sending the partner onboarding details on WhatsApp.";
+    }
+
+    if (sourceContext === "pendingProfessionalProvider") {
+        const verticalCopy = getProfessionalVerticalCopy(getProfessionalContextMeta(context));
+        return `The call just connected. In one short natural opening, introduce yourself as Diya from Doorstep Hub, explain that Doorstep Hub helps professional partners get bookings for ${verticalCopy.examples}, ask ${verticalCopy.askLine.replace("?", "")} in a natural way, and mention that if yes they can download the Partner app and start getting bookings now while you send onboarding details on WhatsApp.`;
     }
 
     if (isPartnerLead) {
@@ -98,7 +138,13 @@ function buildGreetingFallback(context = {}) {
     if (sourceContext === "pendingServiceProvider") {
         const partnerScope = [sourceCategory, sourceRequirement].filter(Boolean).join(" - ");
         const servicesLine = buildLiveCatalogSpeechLine(context);
-        return `Hello! This is Diya from Doorstep Hub. Are you a vendor or service technician looking to grow your business? We help partners receive more customer bookings for ${servicesLine}${partnerScope ? ` in ${partnerScope}` : ""}. Join Doorstep Hub to increase your business and get customer leads in your area. We are sending the partner onboarding details on WhatsApp now.`;
+        return `Hello! This is Diya from Doorstep Hub. Are you a vendor or home appliance service technician looking to grow your business? We help partners receive more customer bookings for home appliance services such as ${servicesLine}${partnerScope ? ` in ${partnerScope}` : ""}. Join Doorstep Hub to increase your business and get customer leads in your area. We are sending the partner onboarding details on WhatsApp now.`;
+    }
+
+    if (sourceContext === "pendingProfessionalProvider") {
+        const verticalCopy = getProfessionalVerticalCopy(getProfessionalContextMeta(context));
+        const partnerScope = [sourceCategory, sourceRequirement].filter(Boolean).join(" - ");
+        return `Hello! This is Diya from Doorstep Hub. ${verticalCopy.pitchLine}${partnerScope ? ` We see your profile is related to ${partnerScope}.` : ""} ${verticalCopy.askLine} ${verticalCopy.closeLine}`;
     }
 
     if (isPartnerLead) {
@@ -220,6 +266,31 @@ function buildPartnerLeadTurnContext(userText = "", context = {}) {
     ].filter(Boolean).join("\n");
 }
 
+function buildPendingProfessionalProviderTurnContext(userText = "", context = {}) {
+    const city = String(context.customerLocation || "").trim();
+    const category = String(context.sourceCategory || context.sourceRequirement || "").trim();
+    const liveCatalogSummary = String(context.liveCatalogSummary || "").trim();
+    const verticalCopy = getProfessionalVerticalCopy(getProfessionalContextMeta(context));
+
+    return [
+        "Pending professional provider onboarding call reminder:",
+        "- This caller is only from the New Professional Requests section.",
+        `- Professional vertical: ${verticalCopy.vertical}.`,
+        `- Service examples for this vertical: ${verticalCopy.examples}.`,
+        `- Ask clearly: ${verticalCopy.askLine}`,
+        `- If they confirm yes, tell them to download the Doorstep Hub Partner app and start getting bookings now, then send partner onboarding WhatsApp.`,
+        `- Pitch line: ${verticalCopy.pitchLine}`,
+        "- Use live professional catalog summary when available. Do not invent unrelated services.",
+        liveCatalogSummary
+            ? `- Live catalog summary: ${liveCatalogSummary}`
+            : "- Live catalog summary: not loaded yet. Call get_live_catalog_snapshot before listing services.",
+        "- Never ask if they personally need customer booking help.",
+        city ? `- Known city/location: ${city}` : "",
+        category ? `- Known category/specialization: ${category}` : "",
+        `Professional partner's latest words: ${String(userText || "").trim()}`,
+    ].filter(Boolean).join("\n");
+}
+
 function buildPendingServiceProviderTurnContext(userText = "", context = {}) {
     const city = String(context.customerLocation || "").trim();
     const category = String(context.sourceCategory || context.sourceRequirement || "").trim();
@@ -228,8 +299,8 @@ function buildPendingServiceProviderTurnContext(userText = "", context = {}) {
     return [
         "Pending service provider vendor onboarding call reminder:",
         "- This caller is only from the New Providers Request section. They are a vendor or service technician lead.",
-        "- Goal: short vendor onboarding pitch. Confirm they are a vendor, explain how joining Doorstep Hub can increase their business with more customer leads, explain services using the live catalog only, invite them to join, and send partner onboarding WhatsApp.",
-        "- When explaining services, use the live catalog summary below or call get_live_catalog_snapshot. Mention real categories, subcategories, or services from the backend. Never invent random service examples.",
+        "- Goal: short vendor onboarding pitch. Confirm they are a vendor, explain how joining Doorstep Hub can increase their business with more customer leads, explain home appliance services only using the live catalog, invite them to join, and send partner onboarding WhatsApp.",
+        "- Doorstep Hub partner onboarding for this section is home appliance services only. Mention real home appliance categories or services from the live catalog. Never mention plumbing, electrical, or unrelated services unless they appear in the live home-appliance catalog.",
         liveCatalogSummary
             ? `- Live catalog summary: ${liveCatalogSummary}`
             : "- Live catalog summary: not loaded yet. Call get_live_catalog_snapshot before listing services.",
@@ -251,8 +322,10 @@ function buildToolFallbackReply(calls = [], results = [], context = {}) {
 
     for (const entry of entries) {
         if (entry.name === "send_whatsapp_message" && entry.result?.success !== false) {
-            return isPendingServiceProviderContext(context)
-                ? "I've sent the Doorstep Hub partner onboarding details to your WhatsApp. Please review them and join our partner network to start receiving more customer bookings."
+            return isPendingProfessionalProviderContext(context)
+                ? "I've sent the Doorstep Hub partner onboarding details to your WhatsApp. If you provide these services, please download the Partner app and start getting bookings now."
+                : isPendingServiceProviderContext(context)
+                ? "I've sent the Doorstep Hub partner onboarding details to your WhatsApp. Please review them and join our partner network to start receiving home appliance service bookings."
                 : isPartnerLeadContext(context)
                 ? "I've sent the partner onboarding details to your WhatsApp. Please review them and our team will guide you on the next steps."
                 : "I've sent the details to your WhatsApp. Please check them and let me know if you need any help.";
@@ -342,7 +415,9 @@ function createConversation({ language = "en", context = {}, sessionId = null } 
     return {
         async reply(userText) {
             try {
-                const groundedMessage = isPendingServiceProviderContext(context)
+                const groundedMessage = isPendingProfessionalProviderContext(context)
+                    ? buildPendingProfessionalProviderTurnContext(userText, context)
+                    : isPendingServiceProviderContext(context)
                     ? buildPendingServiceProviderTurnContext(userText, context)
                     : isPartnerLeadContext(context)
                     ? buildPartnerLeadTurnContext(userText, context)
